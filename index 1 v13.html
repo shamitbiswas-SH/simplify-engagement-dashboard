@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engagement Intelligence — Simplify Group</title>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  CONFIGURATION — UPDATE THESE THREE THINGS BEFORE DEPLOYING
+  ═══════════════════════════════════════════════════════════════════════════
+  1. SHEET_ID — already set to the master engagement sheet
+  2. ACCESS_PIN — set to a 4–6 digit number for soft access control,
+     or leave as '' to disable the gate entirely
+  3. SHEET PERMISSIONS — set the master sheet to
+     "Anyone with the link → Viewer" so the dashboard can fetch it
+
+  Brand: Simplify Group (parent) · per Simplify Family Brand Guidelines 2026
+  Typography: Proxima Nova where licensed/installed, with Mulish as the
+  open-source fallback. Numbers in IBM Plex Mono.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+  :root {
+    --bg-base: #221F20;
+    --bg-card: #2A2728;
+    --bg-elevated: #353131;
+    --bg-hover: #403B3B;
+    --border: #3A3637;
+    --border-strong: #4A4547;
+    --text-primary: #FAFAFA;
+    --text-secondary: #B5B0B1;
+    --text-tertiary: #8A8688;
+    --text-quaternary: #5C5658;
+    --accent: #2D8C4E;
+    --accent-light: #5BB574;
+    --accent-mint: #A8DDB5;
+    --entity-shc:        #4C9CD5;
+    --entity-simplifyx:  #C285BF;
+    --entity-alpha:      #42CCA1;
+    --entity-ventures:   #D6B73E;
+    --entity-group:      #5BB574;
+    --entity-recruiting: #F58532;
+    --entity-docs:       #C968A7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Proxima Nova', 'Mulish', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 12% 12%, rgba(45,140,78,0.05), transparent 45%),
+      radial-gradient(circle at 88% 82%, rgba(91,181,116,0.04), transparent 45%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container {
+    position: relative; z-index: 1;
+    max-width: 1480px; margin: 0 auto;
+    padding: 24px 32px 64px;
+  }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0 22px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; flex-direction: column; gap: 4px; }
+  .brand-eyebrow {
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.32em;
+    color: var(--accent-light);
+  }
+  .brand-mark {
+    font-weight: 800; font-size: 22px;
+    letter-spacing: -0.01em; color: var(--text-primary);
+  }
+  .brand-mark .accent { color: var(--accent-light); font-weight: 800; }
+
+  .topbar-meta { display: flex; align-items: center; gap: 24px; }
+  .scan-date {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .scan-date .label { color: var(--text-quaternary); margin-right: 6px; }
+  .scan-date .value { color: var(--text-primary); font-weight: 500; }
+
+  .toggle {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px; padding: 3px;
+    background: var(--bg-card);
+  }
+  .toggle button {
+    background: transparent; border: none;
+    color: var(--text-secondary);
+    font-family: inherit; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 7px 14px; border-radius: 4px;
+    cursor: pointer; transition: all 0.18s ease;
+  }
+  .toggle button:hover { color: var(--text-primary); }
+  .toggle button.active {
+    background: var(--accent); color: #fff; font-weight: 700;
+  }
+
+  .refresh-btn {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    width: 34px; height: 34px;
+    border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.18s ease;
+  }
+  .refresh-btn:hover { border-color: var(--accent-light); color: var(--accent-light); }
+  .refresh-btn svg { width: 14px; height: 14px; }
+  .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .kpi {
+    background: var(--bg-card);
+    padding: 24px 24px 28px;
+    position: relative; overflow: hidden;
+    transition: background 0.18s;
+  }
+  .kpi:hover { background: var(--bg-elevated); }
+  .kpi-label {
+    font-size: 10px; font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.18em;
+    margin-bottom: 16px;
+  }
+  .kpi-value {
+    font-size: 44px; line-height: 1;
+    color: var(--text-primary);
+    font-weight: 800; letter-spacing: -0.03em;
+  }
+  .kpi-value.numeric {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 30px; font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+  .kpi-detail {
+    margin-top: 10px;
+    font-size: 12px; color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .kpi-detail .num {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text-primary); font-weight: 500;
+  }
+  .kpi-spark {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-light));
+    opacity: 0.6;
+  }
+
+  .section { margin-bottom: 28px; }
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-weight: 700; font-size: 18px;
+    color: var(--text-primary); letter-spacing: -0.01em;
+  }
+  .section-title .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 400; color: var(--text-tertiary);
+    font-size: 11px; margin-left: 12px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  .charts-row {
+    display: grid; grid-template-columns: 1fr 1.6fr;
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .chart-card {
+    background: var(--bg-card);
+    padding: 24px 28px; min-height: 320px;
+  }
+  .chart-card .chart-eyebrow {
+    font-size: 10px; font-weight: 700;
+    color: var(--accent-light);
+    text-transform: uppercase; letter-spacing: 0.22em;
+    margin-bottom: 6px;
+  }
+  .chart-card .chart-title {
+    font-weight: 700; font-size: 18px;
+    color: var(--text-primary);
+    margin-bottom: 18px; letter-spacing: -0.01em;
+  }
+  .chart-canvas-wrap { position: relative; height: 240px; }
+
+  .donut-legend {
+    display: flex; flex-direction: column;
+    gap: 10px; margin-top: 12px;
+  }
+  .donut-legend-item {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--text-secondary);
+  }
+  .donut-legend-item .left { display: flex; align-items: center; gap: 8px; }
+  .donut-legend-item .swatch { width: 8px; height: 8px; border-radius: 2px; }
+  .donut-legend-item .pct { color: var(--text-primary); font-weight: 500; }
+
+  .table-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+  }
+  .table-toolbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+  }
+  .table-toolbar input,
+  .table-toolbar select {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    padding: 8px 12px; border-radius: 4px;
+    font-family: inherit; font-size: 12px;
+    outline: none; transition: border-color 0.18s ease;
+  }
+  .table-toolbar input { width: 240px; }
+  .table-toolbar input:focus,
+  .table-toolbar select:focus { border-color: var(--accent-light); }
+  .table-toolbar input::placeholder {
+    color: var(--text-quaternary);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: 10px; font-weight: 600;
+  }
+  .table-toolbar .count {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .table-toolbar .count .n { color: var(--text-primary); font-weight: 500; }
+
+  .table-scroll { overflow-x: auto; max-height: 640px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--bg-card);
+    position: sticky; top: 0;
+    text-align: left;
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--text-tertiary);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; white-space: nowrap;
+    transition: color 0.18s;
+  }
+  thead th:hover { color: var(--text-primary); }
+  thead th .sort-arrow { opacity: 0.3; margin-left: 4px; font-size: 8px; }
+  thead th.sorted { color: var(--accent-light); }
+  thead th.sorted .sort-arrow { opacity: 1; }
+  thead th.num, tbody td.num {
+    text-align: right; font-variant-numeric: tabular-nums;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.12s;
+  }
+  tbody tr:hover { background: var(--bg-elevated); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 14px 16px; font-size: 13px; vertical-align: middle; }
+
+  .rank-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--text-tertiary);
+    width: 50px; font-weight: 500;
+  }
+  .rank-cell.top1 { color: var(--accent-light); font-weight: 600; }
+  .rank-cell.top3 { color: var(--text-primary); }
+
+  .name-cell { font-weight: 600; color: var(--text-primary); }
+  .headline-cell {
+    font-size: 11px; color: var(--text-tertiary);
+    margin-top: 3px; max-width: 380px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .entity-tag {
+    display: inline-block;
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 4px 8px; border-radius: 3px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    background: transparent;
+  }
+  .entity-tag.shc        { border-color: var(--entity-shc);        color: var(--entity-shc); }
+  .entity-tag.simplifyx  { border-color: var(--entity-simplifyx);  color: var(--entity-simplifyx); }
+  .entity-tag.alpha      { border-color: var(--entity-alpha);      color: var(--entity-alpha); }
+  .entity-tag.ventures   { border-color: var(--entity-ventures);   color: var(--entity-ventures); }
+  .entity-tag.group      { border-color: var(--entity-group);      color: var(--entity-group); }
+  .entity-tag.recruiting { border-color: var(--entity-recruiting); color: var(--entity-recruiting); }
+  .entity-tag.docs       { border-color: var(--entity-docs);       color: var(--entity-docs); }
+  .entity-tag.unknown    { border-color: var(--border-strong); color: var(--text-tertiary); }
+  .entity-tag.external   { border-color: var(--border-strong); color: var(--text-quaternary); }
+  .entity-tag.former     { border-color: rgba(245,133,50,0.4); color: #F58532; opacity: 0.75; }
+
+  .points-cell { font-weight: 600; color: var(--text-primary); font-size: 14px; }
+  .points-cell.zero { color: var(--text-quaternary); font-weight: 400; }
+
+  .lcs-bar {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--text-secondary);
+  }
+  .lcs-bar .l { color: var(--text-secondary); }
+  .lcs-bar .c { color: var(--entity-ventures); }
+  .lcs-bar .s { color: var(--accent-light); font-weight: 600; }
+  .lcs-bar .sep { color: var(--text-quaternary); }
+
+  .posts-grid {
+    display: grid; grid-template-columns: 1fr; gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+  }
+  .post-row {
+    background: var(--bg-card); padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 60px 1fr 240px 100px;
+    gap: 20px; align-items: center;
+    transition: background 0.12s;
+  }
+  .post-row:hover { background: var(--bg-elevated); }
+  .post-rank {
+    font-weight: 800; font-size: 28px;
+    color: var(--text-tertiary); line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  .post-rank.top1 { color: var(--accent-light); }
+  .post-meta { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .post-snippet {
+    font-size: 13px; color: var(--text-primary);
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    line-height: 1.4; font-weight: 500;
+  }
+  .post-detail {
+    display: flex; gap: 12px; align-items: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .post-detail a { color: var(--text-tertiary); text-decoration: none; transition: color 0.12s; }
+  .post-detail a:hover { color: var(--accent-light); }
+  .post-bars { display: flex; gap: 4px; align-items: flex-end; height: 30px; }
+  .post-bars .bar { width: 10px; border-radius: 1px; }
+  .post-bars .bar.likes    { background: var(--text-secondary); }
+  .post-bars .bar.comments { background: var(--entity-ventures); }
+  .post-bars .bar.shares   { background: var(--accent-light); }
+  .post-total {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 24px; font-weight: 500;
+    text-align: right; color: var(--text-primary);
+  }
+
+  .loading, .error-state {
+    padding: 80px 32px; text-align: center;
+    color: var(--text-secondary);
+    font-size: 12px; letter-spacing: 0.1em;
+    text-transform: uppercase; font-weight: 600;
+  }
+  .loading::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--accent-light);
+    border-radius: 50%;
+    margin-right: 12px;
+    animation: pulse 1.4s ease-in-out infinite;
+    transform: translateY(-2px);
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.9) translateY(-2px); }
+    50% { opacity: 1; transform: scale(1.1) translateY(-2px); }
+  }
+  .error-state { color: #F58532; }
+  .error-state .detail {
+    margin-top: 12px; color: var(--text-tertiary);
+    text-transform: none; letter-spacing: 0;
+    font-size: 11px; max-width: 600px;
+    margin-left: auto; margin-right: auto;
+    line-height: 1.6; font-weight: 400;
+  }
+
+  .pin-gate {
+    position: fixed; inset: 0;
+    background: var(--bg-base);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .pin-box { text-align: center; max-width: 380px; padding: 40px; }
+  .pin-eyebrow {
+    font-size: 10px; font-weight: 700;
+    color: var(--accent-light);
+    text-transform: uppercase; letter-spacing: 0.32em;
+    margin-bottom: 12px;
+  }
+  .pin-box h1 {
+    font-weight: 800; font-size: 26px;
+    color: var(--text-primary);
+    margin-bottom: 8px; letter-spacing: -0.02em;
+  }
+  .pin-box p {
+    color: var(--text-tertiary);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    margin-bottom: 28px;
+  }
+  .pin-box input {
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    padding: 14px 18px; border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px; text-align: center;
+    letter-spacing: 0.4em;
+    width: 200px; outline: none;
+    font-weight: 500;
+  }
+  .pin-box input:focus { border-color: var(--accent-light); }
+  .pin-box .hint {
+    margin-top: 12px; font-size: 10px;
+    color: var(--text-quaternary); letter-spacing: 0.15em;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .pin-box .hint.error { color: #F58532; }
+
+  .footer {
+    margin-top: 48px; padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; color: var(--text-quaternary);
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .footer a { color: var(--text-tertiary); text-decoration: none; }
+  .footer a:hover { color: var(--accent-light); }
+
+  @media (max-width: 1100px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .kpi:nth-child(n+4) { border-top: 1px solid var(--border); }
+    .charts-row { grid-template-columns: 1fr; }
+    .post-row { grid-template-columns: 40px 1fr 80px; }
+    .post-row .post-bars { display: none; }
+  }
+  @media (max-width: 700px) {
+    .container { padding: 16px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .kpi-value { font-size: 36px; }
+    .topbar { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .table-toolbar { flex-wrap: wrap; }
+    .table-toolbar input { width: 100%; }
+    thead th, tbody td { padding: 10px 12px; }
+    .headline-cell { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="pinGate" class="pin-gate" style="display:none">
+  <div class="pin-box">
+    <div class="pin-eyebrow">Simplify Group</div>
+    <h1>Engagement Intelligence</h1>
+    <p>Enter Access PIN</p>
+    <input type="password" id="pinInput" inputmode="numeric" autocomplete="off" maxlength="6" autofocus>
+    <div class="hint" id="pinHint">CONFIDENTIAL — INTERNAL LEADERSHIP</div>
+  </div>
+</div>
+
+<div class="container" id="app" style="display:none">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-eyebrow">S I M P L I F Y &nbsp; G R O U P</div>
+      <div class="brand-mark">Engagement <span class="accent">Intelligence</span></div>
+    </div>
+    <div class="topbar-meta">
+      <div class="scan-date"><span class="label">SCAN</span><span class="value" id="scanDate">—</span></div>
+      <div class="toggle">
+        <button class="active" data-view="employees" id="toggleEmp">Employees</button>
+        <button data-view="all" id="toggleAll">All Engagers</button>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" title="Refresh">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.7 1 6.4 2.6"/>
+          <path d="M21 4v5h-5"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi"><div class="kpi-label">Total Score</div><div class="kpi-value" id="kpiScore">—</div><div class="kpi-detail" id="kpiScoreDetail">&nbsp;</div><div class="kpi-spark"></div></div>
+    <div class="kpi"><div class="kpi-label">Active Employees</div><div class="kpi-value" id="kpiActive">—</div><div class="kpi-detail" id="kpiActiveDetail">&nbsp;</div></div>
+    <div class="kpi"><div class="kpi-label">Top Performer</div><div class="kpi-value numeric" id="kpiTop">—</div><div class="kpi-detail" id="kpiTopDetail">&nbsp;</div></div>
+    <div class="kpi"><div class="kpi-label">External Reach</div><div class="kpi-value" id="kpiExt">—</div><div class="kpi-detail" id="kpiExtDetail">&nbsp;</div></div>
+    <div class="kpi"><div class="kpi-label">Posts Tracked</div><div class="kpi-value" id="kpiPosts">—</div><div class="kpi-detail" id="kpiPostsDetail">&nbsp;</div></div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-eyebrow">Engagement Mix</div>
+      <div class="chart-title">Composition of touchpoints</div>
+      <div class="chart-canvas-wrap" style="height:200px"><canvas id="chartMix"></canvas></div>
+      <div class="donut-legend" id="mixLegend"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-eyebrow">By Entity</div>
+      <div class="chart-title">Score &amp; touchpoints across the group</div>
+      <div class="chart-canvas-wrap" style="height:280px"><canvas id="chartEntity"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Leaderboard<span class="num" id="lbCountMeta">—</span></div>
+    </div>
+    <div class="table-card">
+      <div class="table-toolbar">
+        <input type="text" id="lbSearch" placeholder="Search name or headline...">
+        <select id="lbEntity">
+          <option value="">All entities</option>
+        </select>
+        <div class="count">SHOWING <span class="n" id="lbCount">0</span></div>
+      </div>
+      <div class="table-scroll">
+        <table id="lbTable">
+          <thead>
+            <tr>
+              <th class="sortable" data-key="rank">#<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="employee_name">Name<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="employee_entity">Entity<span class="sort-arrow"></span></th>
+              <th class="num sortable sorted desc" data-key="total_points">Score<span class="sort-arrow">▼</span></th>
+              <th class="num sortable" data-key="likes">L · C · S<span class="sort-arrow"></span></th>
+              <th class="num sortable" data-key="total_engagements">Touch-points<span class="sort-arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="lbBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Top Posts<span class="num" id="postsMeta">—</span></div>
+    </div>
+    <div class="posts-grid" id="postsGrid"></div>
+  </div>
+
+  <div class="footer">
+    <div>n8n · Apify · Sheets · GitHub Pages</div>
+    <div>Last refresh: <span id="lastRefresh">—</span></div>
+  </div>
+
+</div>
+
+<div id="loadingState" class="loading">Fetching latest engagement data</div>
+<div id="errorState" class="error-state" style="display:none"></div>
+
+<script>
+const CONFIG = {
+  SHEET_ID: '1yfHdQTh4tZ0iiNagXdgKpJfy6Ndaqj-WWPbhmTkBiDU',
+  LEADERBOARD_TAB: 'Leaderboard',
+  RAW_ENGAGEMENTS_TAB: 'Raw Engagements',
+  ACCESS_PIN: '',
+  REFRESH_MINUTES: 30
+};
+
+const SHEET = id => `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(id)}`;
+
+const ENTITY_COLORS = {
+  'Simplify Healthcare': '#4C9CD5',
+  'SHC': '#4C9CD5',
+  'SimplifyX': '#C285BF',
+  'SimplifyX™': '#C285BF',
+  'Simplify Alpha': '#42CCA1',
+  'Simplify Ventures': '#D6B73E',
+  'Simplify Group': '#5BB574',
+  'Simplify Recruiting': '#F58532',
+  'Simplify Docs': '#C968A7',
+  'Unknown': '#5C5658'
+};
+
+function maybeShowPinGate() {
+  if (!CONFIG.ACCESS_PIN) { showApp(); return; }
+  if (sessionStorage.getItem('eng_unlocked') === '1') { showApp(); return; }
+  document.getElementById('pinGate').style.display = 'flex';
+  document.getElementById('loadingState').style.display = 'none';
+  const inp = document.getElementById('pinInput');
+  const hint = document.getElementById('pinHint');
+  inp.addEventListener('input', () => {
+    if (inp.value === CONFIG.ACCESS_PIN) {
+      sessionStorage.setItem('eng_unlocked', '1');
+      document.getElementById('pinGate').style.display = 'none';
+      showApp();
+    } else if (inp.value.length >= CONFIG.ACCESS_PIN.length) {
+      hint.textContent = 'INVALID PIN';
+      hint.classList.add('error');
+      setTimeout(() => { inp.value = ''; hint.textContent = 'CONFIDENTIAL — INTERNAL LEADERSHIP'; hint.classList.remove('error'); }, 800);
+    }
+  });
+}
+
+function showApp() {
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('loadingState').style.display = 'block';
+  loadAndRender();
+}
+
+let STATE = {
+  leaderboard: [], raw: [],
+  view: 'employees', search: '', entityFilter: '',
+  sortKey: 'total_points', sortDir: 'desc',
+  charts: { mix: null, entity: null }
+};
+
+async function fetchCsv(tab) {
+  const url = SHEET(tab);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${tab}: HTTP ${res.status} — make sure sheet is shared as 'Anyone with link can view'`);
+  const text = await res.text();
+  return new Promise((resolve, reject) => {
+    Papa.parse(text, {
+      header: true, skipEmptyLines: true, dynamicTyping: true,
+      complete: r => resolve(r.data), error: reject
+    });
+  });
+}
+
+async function loadAndRender() {
+  const loadingEl = document.getElementById('loadingState');
+  const errorEl = document.getElementById('errorState');
+  const refreshBtn = document.getElementById('refreshBtn');
+  try {
+    refreshBtn.classList.add('spinning');
+    loadingEl.style.display = 'block';
+    errorEl.style.display = 'none';
+    const [lb, raw] = await Promise.all([
+      fetchCsv(CONFIG.LEADERBOARD_TAB),
+      fetchCsv(CONFIG.RAW_ENGAGEMENTS_TAB)
+    ]);
+    STATE.leaderboard = lb.filter(r => r.employee_name);
+    STATE.raw = raw.filter(r => r.person_name);
+    loadingEl.style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    populateEntityFilter();
+    renderAll();
+    document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  } catch (e) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display = 'block';
+    errorEl.innerHTML = `Failed to load engagement data<div class="detail">${e.message}<br><br>Make sure the master sheet is set to <strong>Anyone with the link → Viewer</strong> (File → Share → General access).</div>`;
+  } finally {
+    refreshBtn.classList.remove('spinning');
+  }
+}
+
+function renderAll() { renderTopbar(); renderKpis(); renderCharts(); renderLeaderboard(); renderTopPosts(); }
+
+function renderTopbar() {
+  const dates = [...new Set(STATE.raw.map(r => r.scan_date).filter(Boolean))];
+  if (dates.length) document.getElementById('scanDate').textContent = dates.sort().slice(-1)[0];
+}
+
+function renderKpis() {
+  const lb = STATE.leaderboard;
+  const raw = STATE.raw;
+  const totalScore = lb.reduce((s, r) => s + (Number(r.total_points) || 0), 0);
+  const totalLikes = lb.reduce((s, r) => s + (Number(r.likes) || 0), 0);
+  const totalComments = lb.reduce((s, r) => s + (Number(r.comments) || 0), 0);
+  const totalShares = lb.reduce((s, r) => s + (Number(r.shares) || 0), 0);
+  const activeEmployees = lb.length;
+  const top = [...lb].sort((a,b) => (Number(b.total_points)||0) - (Number(a.total_points)||0))[0];
+  const externalNames = new Set(
+    raw.filter(r => String(r.is_employee).toLowerCase() === 'false' && !String(r.is_company_page).toLowerCase().includes('true'))
+      .map(r => r.person_name).filter(Boolean)
+  );
+  const uniquePosts = new Set(raw.map(r => r.post_url).filter(Boolean)).size;
+  const uniquePages = new Set(raw.map(r => r.company_page).filter(Boolean)).size;
+
+  document.getElementById('kpiScore').textContent = totalScore.toLocaleString();
+  document.getElementById('kpiScoreDetail').innerHTML = `<span class="num">${totalLikes}</span> likes · <span class="num">${totalComments}</span> comments · <span class="num">${totalShares}</span> shares`;
+  document.getElementById('kpiActive').textContent = activeEmployees;
+  document.getElementById('kpiActiveDetail').textContent = `with ≥1 engagement this scan`;
+  document.getElementById('kpiTop').textContent = top ? top.employee_name : '—';
+  document.getElementById('kpiTopDetail').innerHTML = top ? `<span class="num">${top.total_points}</span> pts · ${top.employee_entity || 'Unknown'}` : '';
+  document.getElementById('kpiExt').textContent = externalNames.size;
+  document.getElementById('kpiExtDetail').textContent = `unique externals reposted/reacted`;
+  document.getElementById('kpiPosts').textContent = uniquePosts;
+  document.getElementById('kpiPostsDetail').innerHTML = `across <span class="num">${uniquePages}</span> company pages`;
+}
+
+function renderCharts() {
+  const lb = STATE.leaderboard;
+  const totalLikes = lb.reduce((s, r) => s + (Number(r.likes) || 0), 0);
+  const totalComments = lb.reduce((s, r) => s + (Number(r.comments) || 0), 0);
+  const totalShares = lb.reduce((s, r) => s + (Number(r.shares) || 0), 0);
+  const total = totalLikes + totalComments + totalShares;
+
+  if (STATE.charts.mix) STATE.charts.mix.destroy();
+  STATE.charts.mix = new Chart(document.getElementById('chartMix'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Likes', 'Comments', 'Shares'],
+      datasets: [{
+        data: [totalLikes, totalComments, totalShares],
+        backgroundColor: ['#B5B0B1', '#D6B73E', '#5BB574'],
+        borderColor: '#221F20', borderWidth: 2, hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#2A2728', titleColor: '#FAFAFA',
+          bodyColor: '#B5B0B1', borderColor: '#4A4547', borderWidth: 1,
+          padding: 12, displayColors: false,
+          titleFont: { family: 'IBM Plex Mono', size: 11 },
+          bodyFont: { family: 'IBM Plex Mono', size: 11 }
+        }
+      }
+    }
+  });
+  const legendData = [
+    { label: 'Likes', val: totalLikes, color: '#B5B0B1', weight: 1 },
+    { label: 'Comments', val: totalComments, color: '#D6B73E', weight: 3 },
+    { label: 'Shares', val: totalShares, color: '#5BB574', weight: 5 }
+  ];
+  document.getElementById('mixLegend').innerHTML = legendData.map(d =>
+    `<div class="donut-legend-item"><div class="left"><div class="swatch" style="background:${d.color}"></div>${d.label} <span style="color:var(--text-quaternary); margin-left:4px">×${d.weight}pt</span></div><div><span style="color:var(--text-tertiary); margin-right:8px">${d.val}</span><span class="pct">${total ? Math.round(d.val/total*100) : 0}%</span></div></div>`
+  ).join('');
+
+  const byEntity = {};
+  STATE.leaderboard.forEach(r => {
+    const e = r.employee_entity || 'Unknown';
+    if (!byEntity[e]) byEntity[e] = { score: 0, count: 0 };
+    byEntity[e].score += Number(r.total_points) || 0;
+    byEntity[e].count += 1;
+  });
+  const sorted = Object.entries(byEntity).sort((a,b) => b[1].score - a[1].score);
+
+  if (STATE.charts.entity) STATE.charts.entity.destroy();
+  STATE.charts.entity = new Chart(document.getElementById('chartEntity'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(e => e[0]),
+      datasets: [{
+        label: 'Total Score',
+        data: sorted.map(e => e[1].score),
+        backgroundColor: sorted.map(e => ENTITY_COLORS[e[0]] || '#5C5658'),
+        borderRadius: 3, barThickness: 22
+      }, {
+        label: 'Active Employees',
+        data: sorted.map(e => e[1].count),
+        backgroundColor: sorted.map(e => (ENTITY_COLORS[e[0]] || '#5C5658') + '55'),
+        borderRadius: 3, barThickness: 22
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      scales: {
+        x: { grid: { color: '#2A2728', drawBorder: false }, ticks: { color: '#8A8688', font: { family: 'IBM Plex Mono', size: 10 } } },
+        y: { grid: { display: false }, ticks: { color: '#B5B0B1', font: { family: 'Mulish', size: 11, weight: '600' } } }
+      },
+      plugins: {
+        legend: {
+          position: 'top', align: 'end',
+          labels: { color: '#B5B0B1', font: { family: 'Mulish', size: 10, weight: '600' }, boxWidth: 8, boxHeight: 8, padding: 12 }
+        },
+        tooltip: {
+          backgroundColor: '#2A2728', titleColor: '#FAFAFA',
+          bodyColor: '#B5B0B1', borderColor: '#4A4547', borderWidth: 1,
+          padding: 12, displayColors: true,
+          titleFont: { family: 'IBM Plex Mono', size: 11 },
+          bodyFont: { family: 'IBM Plex Mono', size: 11 }
+        }
+      }
+    }
+  });
+}
+
+function entityClass(e) {
+  if (!e || e === 'Unknown') return 'unknown';
+  const k = e.toLowerCase();
+  if (k.includes('shc') || k.includes('healthcare')) return 'shc';
+  if (k.includes('simplifyx') || k.includes('simplify x')) return 'simplifyx';
+  if (k.includes('alpha')) return 'alpha';
+  if (k.includes('ventures')) return 'ventures';
+  if (k.includes('group')) return 'group';
+  if (k.includes('recruiting')) return 'recruiting';
+  if (k.includes('docs')) return 'docs';
+  return 'unknown';
+}
+
+function entityShort(e) {
+  if (!e) return '—';
+  return e
+    .replace('Simplify Healthcare', 'SHC')
+    .replace('Simplify Recruiting', 'Recruiting')
+    .replace('Simplify Group', 'Group')
+    .replace('Simplify Alpha', 'Alpha')
+    .replace('Simplify Ventures', 'Ventures')
+    .replace('Simplify Docs', 'Docs');
+}
+
+function populateEntityFilter() {
+  const sel = document.getElementById('lbEntity');
+  const entities = [...new Set(STATE.leaderboard.map(r => r.employee_entity).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All entities</option>' + entities.map(e => `<option value="${e}">${entityShort(e)}</option>`).join('');
+}
+
+function getViewRows() {
+  if (STATE.view === 'employees') {
+    return STATE.leaderboard.map(r => ({
+      employee_name: r.employee_name,
+      headline: r.headline,
+      employee_entity: r.employee_entity,
+      total_points: Number(r.total_points) || 0,
+      likes: Number(r.likes) || 0,
+      comments: Number(r.comments) || 0,
+      shares: Number(r.shares) || 0,
+      total_engagements: Number(r.total_engagements) || 0,
+      linkedin_url: r.linkedin_url,
+      is_employee: true
+    }));
+  }
+  const map = new Map();
+  STATE.raw.forEach(r => {
+    if (!r.person_name) return;
+    if (String(r.is_company_page).toLowerCase().includes('true')) return;
+    const key = r.person_name.trim();
+    if (!map.has(key)) {
+      map.set(key, {
+        employee_name: key,
+        headline: r.person_headline || '',
+        employee_entity: r.employee_entity || (String(r.is_employee).toLowerCase() === 'true' ? 'Unknown' : 'External'),
+        likes: 0, comments: 0, shares: 0,
+        linkedin_url: r.person_linkedin_url || '',
+        is_employee: String(r.is_employee).toLowerCase() === 'true',
+        match_tier: r.match_tier || ''
+      });
+    }
+    const e = map.get(key);
+    if (r.engagement_type === 'LIKE') e.likes++;
+    else if (r.engagement_type === 'COMMENT') e.comments++;
+    else if (r.engagement_type === 'SHARE') e.shares++;
+  });
+  return Array.from(map.values()).map(e => ({
+    ...e,
+    total_points: e.likes + e.comments * 3 + e.shares * 5,
+    total_engagements: e.likes + e.comments + e.shares
+  }));
+}
+
+function renderLeaderboard() {
+  let rows = getViewRows();
+  if (STATE.search) {
+    const q = STATE.search.toLowerCase();
+    rows = rows.filter(r =>
+      (r.employee_name || '').toLowerCase().includes(q) ||
+      (r.headline || '').toLowerCase().includes(q)
+    );
+  }
+  if (STATE.entityFilter) rows = rows.filter(r => r.employee_entity === STATE.entityFilter);
+
+  rows.sort((a, b) => {
+    let av = a[STATE.sortKey], bv = b[STATE.sortKey];
+    if (STATE.sortKey === 'likes') {
+      av = a.likes * 1 + a.comments * 3 + a.shares * 5;
+      bv = b.likes * 1 + b.comments * 3 + b.shares * 5;
+    }
+    if (typeof av === 'string') { av = av.toLowerCase(); bv = (bv||'').toString().toLowerCase(); }
+    av = av ?? (typeof bv === 'number' ? -Infinity : '');
+    bv = bv ?? (typeof av === 'number' ? -Infinity : '');
+    if (av < bv) return STATE.sortDir === 'desc' ? 1 : -1;
+    if (av > bv) return STATE.sortDir === 'desc' ? -1 : 1;
+    return 0;
+  });
+
+  const body = document.getElementById('lbBody');
+  body.innerHTML = rows.map((r, i) => {
+    const rank = i + 1;
+    const rankClass = rank === 1 ? 'top1' : (rank <= 3 ? 'top3' : '');
+    const entityCls = r.is_employee
+      ? entityClass(r.employee_entity)
+      : (r.match_tier === 'FORMER' ? 'former' : 'external');
+    const entityLabel = r.is_employee
+      ? entityShort(r.employee_entity)
+      : (r.match_tier === 'FORMER' ? 'Former' : 'External');
+    const profileLink = r.linkedin_url
+      ? `<a href="${r.linkedin_url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${r.employee_name}</a>`
+      : r.employee_name;
+    return `<tr>
+      <td class="rank-cell ${rankClass}">${String(rank).padStart(2,'0')}</td>
+      <td>
+        <div class="name-cell">${profileLink}</div>
+        ${r.headline ? `<div class="headline-cell">${escapeHtml(r.headline)}</div>` : ''}
+      </td>
+      <td><span class="entity-tag ${entityCls}">${entityLabel}</span></td>
+      <td class="num points-cell ${r.total_points === 0 ? 'zero' : ''}">${r.total_points}</td>
+      <td class="num">
+        <span class="lcs-bar">
+          <span class="l">${r.likes}</span><span class="sep">·</span><span class="c">${r.comments}</span><span class="sep">·</span><span class="s">${r.shares}</span>
+        </span>
+      </td>
+      <td class="num">${r.total_engagements}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('lbCount').textContent = rows.length;
+  document.getElementById('lbCountMeta').textContent = `${rows.length} ROWS`;
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderTopPosts() {
+  const map = new Map();
+  STATE.raw.forEach(r => {
+    const url = r.post_url;
+    if (!url) return;
+    if (!map.has(url)) {
+      map.set(url, {
+        post_url: url,
+        post_snippet: r.post_snippet || '(no preview text)',
+        company_page: r.company_page || '—',
+        post_date: r.post_date || '—',
+        likes: 0, comments: 0, shares: 0
+      });
+    }
+    const p = map.get(url);
+    if (r.engagement_type === 'LIKE') p.likes++;
+    else if (r.engagement_type === 'COMMENT') p.comments++;
+    else if (r.engagement_type === 'SHARE') p.shares++;
+  });
+  const posts = Array.from(map.values()).map(p => ({
+    ...p,
+    total: p.likes + p.comments + p.shares,
+    score: p.likes + p.comments * 3 + p.shares * 5
+  })).sort((a,b) => b.score - a.score).slice(0, 10);
+
+  const maxLikes = Math.max(...posts.map(p => p.likes), 1);
+  const maxComments = Math.max(...posts.map(p => p.comments), 1);
+  const maxShares = Math.max(...posts.map(p => p.shares), 1);
+
+  const grid = document.getElementById('postsGrid');
+  grid.innerHTML = posts.map((p, i) => `
+    <div class="post-row">
+      <div class="post-rank ${i===0?'top1':''}">${String(i+1).padStart(2,'0')}</div>
+      <div class="post-meta">
+        <div class="post-snippet">${escapeHtml(p.post_snippet)}</div>
+        <div class="post-detail">
+          <span>${escapeHtml(p.company_page)}</span>
+          <span>·</span>
+          <span>${escapeHtml(p.post_date)}</span>
+          <span>·</span>
+          <a href="${p.post_url}" target="_blank" rel="noopener">Open ↗</a>
+        </div>
+      </div>
+      <div class="post-bars" title="${p.likes} likes · ${p.comments} comments · ${p.shares} shares">
+        <div class="bar likes" style="height:${Math.max(4, (p.likes/maxLikes)*30)}px"></div>
+        <div class="bar comments" style="height:${Math.max(4, (p.comments/maxComments)*30)}px"></div>
+        <div class="bar shares" style="height:${Math.max(4, (p.shares/maxShares)*30)}px"></div>
+      </div>
+      <div class="post-total">${p.score}</div>
+    </div>
+  `).join('');
+  document.getElementById('postsMeta').textContent = `${posts.length} POSTS`;
+}
+
+document.querySelectorAll('.toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.toggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.view = btn.dataset.view;
+    renderLeaderboard();
+  });
+});
+document.getElementById('lbSearch').addEventListener('input', e => { STATE.search = e.target.value; renderLeaderboard(); });
+document.getElementById('lbEntity').addEventListener('change', e => { STATE.entityFilter = e.target.value; renderLeaderboard(); });
+document.querySelectorAll('th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const k = th.dataset.key;
+    if (STATE.sortKey === k) STATE.sortDir = STATE.sortDir === 'desc' ? 'asc' : 'desc';
+    else { STATE.sortKey = k; STATE.sortDir = ['employee_name','employee_entity'].includes(k) ? 'asc' : 'desc'; }
+    document.querySelectorAll('th.sortable').forEach(t => {
+      t.classList.remove('sorted');
+      const arrow = t.querySelector('.sort-arrow');
+      if (arrow) arrow.textContent = '';
+    });
+    th.classList.add('sorted');
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = STATE.sortDir === 'desc' ? '▼' : '▲';
+    renderLeaderboard();
+  });
+});
+document.getElementById('refreshBtn').addEventListener('click', loadAndRender);
+if (CONFIG.REFRESH_MINUTES > 0) setInterval(loadAndRender, CONFIG.REFRESH_MINUTES * 60 * 1000);
+maybeShowPinGate();
+</script>
+
+</body>
+</html>
