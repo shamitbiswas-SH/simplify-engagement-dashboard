@@ -357,7 +357,7 @@
     border-radius: 6px; overflow: hidden;
   }
   .post-row {
-    background: var(--bg-card); padding: 16px 20px;
+    background: var(--bg-card); padding: 16px 50px 16px 20px;
     display: grid;
     grid-template-columns: 60px 1fr 240px 100px;
     gap: 20px; align-items: center;
@@ -394,6 +394,112 @@
     font-family: 'IBM Plex Mono', monospace;
     font-size: 24px; font-weight: 500;
     text-align: right; color: var(--text-primary);
+  }
+
+  /* Post drill-down */
+  .post-row { cursor: pointer; position: relative; }
+  .post-row::after {
+    content: '+';
+    position: absolute;
+    right: 24px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-tertiary);
+    font-size: 16px;
+    font-weight: 300;
+    transition: transform 0.18s ease, color 0.18s ease;
+    pointer-events: none;
+  }
+  .post-row.expanded { background: var(--bg-elevated); }
+  .post-row.expanded::after {
+    content: '−';
+    color: var(--accent-light);
+    transform: translateY(-50%) scale(1.2);
+  }
+  .post-detail-panel {
+    background: var(--bg-base);
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    border-top: 0 solid var(--border);
+  }
+  .post-detail-panel.open {
+    max-height: 2000px;
+    padding: 24px 28px 28px 28px;
+    border-top: 1px solid var(--border);
+  }
+  .post-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+  }
+  .post-detail-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .post-detail-col .col-head {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .post-detail-col .col-head.likes    { color: var(--text-secondary); }
+  .post-detail-col .col-head.comments { color: var(--entity-ventures); }
+  .post-detail-col .col-head.shares   { color: var(--accent-light); }
+  .post-detail-col .col-head .count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .engager-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--bg-card);
+  }
+  .engager-row:last-child { border-bottom: none; }
+  .engager-row .name {
+    color: var(--text-primary);
+    font-weight: 500;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .engager-row .name a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .engager-row .name a:hover {
+    color: var(--accent-light);
+    text-decoration: underline;
+  }
+  .engager-row .badge {
+    font-size: 8.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+  .engager-empty {
+    color: var(--text-quaternary);
+    font-size: 11px;
+    font-style: italic;
+    padding: 12px 0;
+    text-align: center;
   }
 
   .loading, .error-state {
@@ -587,7 +693,11 @@
 
   <div class="section">
     <div class="section-head">
-      <div class="section-title">Top Posts<span class="num" id="postsMeta">—</span></div>
+      <div class="section-title">Posts<span class="num" id="postsMeta">—</span></div>
+      <div class="toggle" style="margin-left:auto">
+        <button class="active" data-posts-view="top10" id="postsTop10">Top 10</button>
+        <button data-posts-view="all" id="postsAll">All Posts</button>
+      </div>
     </div>
     <div class="posts-grid" id="postsGrid"></div>
   </div>
@@ -656,6 +766,7 @@ let STATE = {
   leaderboard: [], raw: [],
   view: 'employees', search: '', entityFilter: '',
   sortKey: 'total_points', sortDir: 'desc',
+  postsView: 'top10',
   charts: { mix: null, entity: null }
 };
 
@@ -972,55 +1083,154 @@ function renderTopPosts() {
         post_snippet: r.post_snippet || '(no preview text)',
         company_page: r.company_page || '—',
         post_date: r.post_date || '—',
-        likes: 0, comments: 0, shares: 0
+        likes: 0, comments: 0, shares: 0,
+        engagers: { LIKE: [], COMMENT: [], SHARE: [] }
       });
     }
     const p = map.get(url);
     if (r.engagement_type === 'LIKE') p.likes++;
     else if (r.engagement_type === 'COMMENT') p.comments++;
     else if (r.engagement_type === 'SHARE') p.shares++;
+    if (p.engagers[r.engagement_type] && r.person_name) {
+      p.engagers[r.engagement_type].push({
+        name: r.person_name,
+        headline: r.person_headline || '',
+        linkedin_url: r.person_linkedin_url || '',
+        is_employee: String(r.is_employee).toLowerCase() === 'true',
+        is_company_page: String(r.is_company_page).toLowerCase().includes('true'),
+        employee_entity: r.employee_entity || '',
+        match_tier: r.match_tier || ''
+      });
+    }
   });
-  const posts = Array.from(map.values()).map(p => ({
+  const allPosts = Array.from(map.values()).map(p => ({
     ...p,
     total: p.likes + p.comments + p.shares,
     score: p.likes + p.comments * 3 + p.shares * 5
-  })).sort((a,b) => b.score - a.score).slice(0, 10);
+  })).sort((a,b) => b.score - a.score);
+
+  const posts = STATE.postsView === 'all' ? allPosts : allPosts.slice(0, 10);
 
   const maxLikes = Math.max(...posts.map(p => p.likes), 1);
   const maxComments = Math.max(...posts.map(p => p.comments), 1);
   const maxShares = Math.max(...posts.map(p => p.shares), 1);
 
   const grid = document.getElementById('postsGrid');
-  grid.innerHTML = posts.map((p, i) => `
-    <div class="post-row">
-      <div class="post-rank ${i===0?'top1':''}">${String(i+1).padStart(2,'0')}</div>
-      <div class="post-meta">
-        <div class="post-snippet">${escapeHtml(p.post_snippet)}</div>
-        <div class="post-detail">
-          <span>${escapeHtml(p.company_page)}</span>
-          <span>·</span>
-          <span>${escapeHtml(p.post_date)}</span>
-          <span>·</span>
-          <a href="${p.post_url}" target="_blank" rel="noopener">Open ↗</a>
+  grid.innerHTML = posts.map((p, i) => {
+    const safeId = 'post-' + i;
+    return `
+      <div class="post-row" data-post-id="${safeId}">
+        <div class="post-rank ${i===0?'top1':''}">${String(i+1).padStart(2,'0')}</div>
+        <div class="post-meta">
+          <div class="post-snippet">${escapeHtml(p.post_snippet)}</div>
+          <div class="post-detail">
+            <span>${escapeHtml(p.company_page)}</span>
+            <span>·</span>
+            <span>${escapeHtml(p.post_date)}</span>
+            <span>·</span>
+            <a href="${p.post_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open ↗</a>
+          </div>
         </div>
+        <div class="post-bars" title="${p.likes} likes · ${p.comments} comments · ${p.shares} shares">
+          <div class="bar likes" style="height:${Math.max(4, (p.likes/maxLikes)*30)}px"></div>
+          <div class="bar comments" style="height:${Math.max(4, (p.comments/maxComments)*30)}px"></div>
+          <div class="bar shares" style="height:${Math.max(4, (p.shares/maxShares)*30)}px"></div>
+        </div>
+        <div class="post-total">${p.score}</div>
       </div>
-      <div class="post-bars" title="${p.likes} likes · ${p.comments} comments · ${p.shares} shares">
-        <div class="bar likes" style="height:${Math.max(4, (p.likes/maxLikes)*30)}px"></div>
-        <div class="bar comments" style="height:${Math.max(4, (p.comments/maxComments)*30)}px"></div>
-        <div class="bar shares" style="height:${Math.max(4, (p.shares/maxShares)*30)}px"></div>
+      <div class="post-detail-panel" data-detail-for="${safeId}">
+        ${renderEngagersBreakdown(p)}
       </div>
-      <div class="post-total">${p.score}</div>
+    `;
+  }).join('');
+
+  // wire up click-to-expand
+  grid.querySelectorAll('.post-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const id = row.dataset.postId;
+      const panel = grid.querySelector(`.post-detail-panel[data-detail-for="${id}"]`);
+      const wasOpen = panel.classList.contains('open');
+      // close all others
+      grid.querySelectorAll('.post-detail-panel.open').forEach(p => p.classList.remove('open'));
+      grid.querySelectorAll('.post-row.expanded').forEach(r => r.classList.remove('expanded'));
+      if (!wasOpen) {
+        panel.classList.add('open');
+        row.classList.add('expanded');
+      }
+    });
+  });
+
+  document.getElementById('postsMeta').textContent =
+    `${posts.length}${STATE.postsView === 'all' ? '' : ' OF ' + allPosts.length} · CLICK TO EXPAND`;
+}
+
+function renderEngagersBreakdown(post) {
+  function engagerRow(p) {
+    const isEmployee = p.is_employee && !p.is_company_page;
+    const cls = isEmployee
+      ? entityClass(p.employee_entity)
+      : (p.is_company_page ? 'unknown' : (p.match_tier === 'FORMER' ? 'former' : 'external'));
+    const label = isEmployee
+      ? entityShort(p.employee_entity)
+      : (p.is_company_page ? 'Page' : (p.match_tier === 'FORMER' ? 'Former' : 'External'));
+    const nameLink = p.linkedin_url
+      ? `<a href="${p.linkedin_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(p.name)}</a>`
+      : escapeHtml(p.name);
+    return `<div class="engager-row">
+      <span class="name">${nameLink}</span>
+      <span class="entity-tag ${cls}">${label}</span>
+    </div>`;
+  }
+
+  function sortEngagers(list) {
+    // employees first, then by name
+    return list.slice().sort((a, b) => {
+      const aEmp = a.is_employee && !a.is_company_page ? 0 : 1;
+      const bEmp = b.is_employee && !b.is_company_page ? 0 : 1;
+      if (aEmp !== bEmp) return aEmp - bEmp;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }
+
+  const likes = sortEngagers(post.engagers.LIKE);
+  const comments = sortEngagers(post.engagers.COMMENT);
+  const shares = sortEngagers(post.engagers.SHARE);
+
+  const colHtml = (title, list, cls) => `
+    <div class="post-detail-col">
+      <div class="col-head ${cls}">
+        <span>${title}</span>
+        <span class="count">${list.length}</span>
+      </div>
+      ${list.length === 0
+        ? '<div class="engager-empty">no ' + title.toLowerCase() + '</div>'
+        : list.map(engagerRow).join('')}
     </div>
-  `).join('');
-  document.getElementById('postsMeta').textContent = `${posts.length} POSTS`;
+  `;
+
+  return `
+    <div class="post-detail-grid">
+      ${colHtml('Likes', likes, 'likes')}
+      ${colHtml('Comments', comments, 'comments')}
+      ${colHtml('Shares', shares, 'shares')}
+    </div>
+  `;
 }
 
 document.querySelectorAll('.toggle button').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.toggle button').forEach(b => b.classList.remove('active'));
+    // figure out which toggle group this button belongs to
+    const parent = btn.closest('.toggle');
+    parent.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    STATE.view = btn.dataset.view;
-    renderLeaderboard();
+    if (btn.dataset.view) {
+      STATE.view = btn.dataset.view;
+      renderLeaderboard();
+    }
+    if (btn.dataset.postsView) {
+      STATE.postsView = btn.dataset.postsView;
+      renderTopPosts();
+    }
   });
 });
 document.getElementById('lbSearch').addEventListener('input', e => { STATE.search = e.target.value; renderLeaderboard(); });
