@@ -144,6 +144,26 @@
     text-transform: none; letter-spacing: 0; font-weight: 500;
   }
 
+  /* Posts section controls: company-page filter + view toggle */
+  .posts-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+  .posts-company-select {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    font-family: inherit; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 8px 30px 8px 13px; border-radius: 6px;
+    cursor: pointer; outline: none;
+    transition: border-color 0.18s ease;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235BB574' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 11px center;
+    max-width: 230px;
+  }
+  .posts-company-select:hover { border-color: var(--accent-light); }
+  .posts-company-select:focus { border-color: var(--accent-light); }
+  .posts-company-select option { background: var(--bg-elevated); color: var(--text-primary); }
+
   .toggle {
     display: inline-flex;
     border: 1px solid var(--border-strong);
@@ -752,9 +772,12 @@
   <div class="section">
     <div class="section-head">
       <div class="section-title">Posts<span class="num" id="postsMeta">—</span></div>
-      <div class="toggle" style="margin-left:auto">
-        <button class="active" data-posts-view="top10" id="postsTop10">Top 10</button>
-        <button data-posts-view="all" id="postsAll">All Posts</button>
+      <div class="posts-controls">
+        <select id="postsCompany" class="posts-company-select"><option value="">All pages</option></select>
+        <div class="toggle">
+          <button class="active" data-posts-view="top10" id="postsTop10">Top 10</button>
+          <button data-posts-view="all" id="postsAll">All Posts</button>
+        </div>
       </div>
     </div>
     <div class="posts-grid" id="postsGrid"></div>
@@ -787,7 +810,6 @@ const SHEET = id => `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/g
 
 const ENTITY_COLORS = {
   'Simplify Healthcare': '#4C9CD5',
-  'SHC': '#4C9CD5',
   'SimplifyX': '#C285BF',
   'SimplifyX™': '#C285BF',
   'Simplify Alpha': '#42CCA1',
@@ -830,6 +852,7 @@ let STATE = {
   view: 'employees', search: '', entityFilter: '',
   sortKey: 'total_points', sortDir: 'desc',
   postsView: 'top10',
+  postsCompany: '',
   period: 'last7',
   charts: { mix: null, entity: null }
 };
@@ -960,6 +983,7 @@ async function loadAndRender() {
     document.getElementById('app').style.display = 'block';
     populateEntityFilter();
     populatePeriodSelect();
+    populatePostsCompanyFilter();
     renderAll();
     document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   } catch (e) {
@@ -1122,15 +1146,9 @@ function entityClass(e) {
 }
 
 function entityShort(e) {
+  // Full brand names — no abbreviations; entity names are shown exactly as stored
   if (!e) return '—';
-  return e
-    .replace('Simplify Healthcare', 'SHC')
-    .replace('Simplify Recruiting', 'Recruiting')
-    .replace('Simplify Group', 'Group')
-    .replace('Simplify Alpha', 'Alpha')
-    .replace('Simplify Ventures', 'Ventures')
-    .replace('Simplify Connect', 'Connect')
-    .replace('Simplify Docs', 'Docs');
+  return String(e).replace('™', '').trim();
 }
 
 function populateEntityFilter() {
@@ -1142,6 +1160,15 @@ function populateEntityFilter() {
       .map(r => r.employee_entity).filter(Boolean)
   )].sort();
   sel.innerHTML = '<option value="">All entities</option>' + entities.map(e => `<option value="${e}">${entityShort(e)}</option>`).join('');
+}
+
+function populatePostsCompanyFilter() {
+  const sel = document.getElementById('postsCompany');
+  if (!sel) return;
+  const pages = [...new Set(STATE.raw.map(r => r.company_page).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All pages</option>' + pages.map(p => `<option value="${p}">${p}</option>`).join('');
+  if (![...sel.options].some(o => o.value === STATE.postsCompany)) STATE.postsCompany = '';
+  sel.value = STATE.postsCompany;
 }
 
 function getViewRows() {
@@ -1252,7 +1279,8 @@ function escapeHtml(s) {
 
 function renderTopPosts() {
   const map = new Map();
-  getActiveRaw().forEach(r => {
+  const rows = getActiveRaw().filter(r => !STATE.postsCompany || r.company_page === STATE.postsCompany);
+  rows.forEach(r => {
     const url = r.post_url;
     if (!url) return;
     if (!map.has(url)) {
@@ -1414,6 +1442,7 @@ document.querySelectorAll('.toggle button').forEach(btn => {
 document.getElementById('lbSearch').addEventListener('input', e => { STATE.search = e.target.value; renderLeaderboard(); });
 document.getElementById('lbEntity').addEventListener('change', e => { STATE.entityFilter = e.target.value; renderLeaderboard(); });
 document.getElementById('periodSelect').addEventListener('change', e => { STATE.period = e.target.value; renderAll(); });
+document.getElementById('postsCompany').addEventListener('change', e => { STATE.postsCompany = e.target.value; renderTopPosts(); });
 document.querySelectorAll('th.sortable').forEach(th => {
   th.addEventListener('click', () => {
     const k = th.dataset.key;
