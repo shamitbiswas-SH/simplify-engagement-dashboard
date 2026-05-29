@@ -18,6 +18,15 @@
   Brand: Simplify Group (parent) · per Simplify Family Brand Guidelines 2026
   Typography: Proxima Nova where licensed/installed, with Mulish as the
   open-source fallback. Numbers in IBM Plex Mono.
+
+  ── PERIOD DROPDOWN (added) ─────────────────────────────────────────────────
+  A "Period" selector in the top bar lets leadership view "Last 7 Days" (the
+  live default, from the Leaderboard tab) or any past month (April 2026 onward),
+  computed on the fly from the Raw Engagements tab using post_date. Monthly
+  leaderboards use the same scoring (Like 1 / Comment 3 / Share 5) and
+  de-duplicate by name + post + type so overlapping weekly scans never
+  double-count. New months appear automatically as data accumulates.
+  Edit MIN_MONTH below to change the earliest month shown.
   ═══════════════════════════════════════════════════════════════════════════
 -->
 
@@ -50,6 +59,7 @@
     --entity-group:      #5BB574;
     --entity-recruiting: #F58532;
     --entity-docs:       #C968A7;
+    --entity-connect:    #8C7BE6;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -105,6 +115,34 @@
   }
   .scan-date .label { color: var(--text-quaternary); margin-right: 6px; }
   .scan-date .value { color: var(--text-primary); font-weight: 500; }
+
+  /* Period dropdown — matches the toggle / select language */
+  .period-picker { display: inline-flex; align-items: center; gap: 9px; }
+  .period-picker .period-label {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.16em;
+    color: var(--text-quaternary);
+  }
+  .period-picker select {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    font-family: inherit; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 8px 30px 8px 13px; border-radius: 6px;
+    cursor: pointer; outline: none;
+    transition: border-color 0.18s ease, color 0.18s ease;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235BB574' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 11px center;
+  }
+  .period-picker select:hover { border-color: var(--accent-light); }
+  .period-picker select:focus { border-color: var(--accent-light); }
+  .period-picker select option {
+    background: var(--bg-elevated); color: var(--text-primary);
+    text-transform: none; letter-spacing: 0; font-weight: 500;
+  }
 
   .toggle {
     display: inline-flex;
@@ -184,6 +222,10 @@
     background: linear-gradient(90deg, var(--accent), var(--accent-light));
     opacity: 0.6;
   }
+  /* Winner emphasis when a month is selected */
+  .kpi.winner { background: linear-gradient(180deg, rgba(91,181,116,0.10), var(--bg-card)); }
+  .kpi.winner .kpi-label { color: var(--accent-light); }
+  .kpi.winner .kpi-value { font-family: 'Proxima Nova','Mulish',sans-serif; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
 
   .section { margin-bottom: 28px; }
   .section-head {
@@ -199,6 +241,16 @@
     font-weight: 400; color: var(--text-tertiary);
     font-size: 11px; margin-left: 12px;
     letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .period-badge {
+    display: inline-block; margin-left: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 500;
+    color: var(--accent-light);
+    border: 1px solid rgba(91,181,116,0.4);
+    border-radius: 3px; padding: 2px 8px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    vertical-align: middle;
   }
 
   .charts-row {
@@ -330,6 +382,7 @@
   .entity-tag.simplifyx  { border-color: var(--entity-simplifyx);  color: var(--entity-simplifyx); }
   .entity-tag.alpha      { border-color: var(--entity-alpha);      color: var(--entity-alpha); }
   .entity-tag.ventures   { border-color: var(--entity-ventures);   color: var(--entity-ventures); }
+  .entity-tag.connect    { border-color: var(--entity-connect);    color: var(--entity-connect); }
   .entity-tag.group      { border-color: var(--entity-group);      color: var(--entity-group); }
   .entity-tag.recruiting { border-color: var(--entity-recruiting); color: var(--entity-recruiting); }
   .entity-tag.docs       { border-color: var(--entity-docs);       color: var(--entity-docs); }
@@ -598,6 +651,7 @@
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
     .kpi-value { font-size: 36px; }
     .topbar { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .topbar-meta { flex-wrap: wrap; gap: 14px; }
     .table-toolbar { flex-wrap: wrap; }
     .table-toolbar input { width: 100%; }
     thead th, tbody td { padding: 10px 12px; }
@@ -626,6 +680,10 @@
     </div>
     <div class="topbar-meta">
       <div class="scan-date"><span class="label">SCAN</span><span class="value" id="scanDate">—</span></div>
+      <div class="period-picker">
+        <span class="period-label">Period</span>
+        <select id="periodSelect"><option value="last7">Last 7 Days</option></select>
+      </div>
       <div class="toggle">
         <button class="active" data-view="employees" id="toggleEmp">Employees</button>
         <button data-view="all" id="toggleAll">All Engagers</button>
@@ -642,7 +700,7 @@
   <div class="kpi-grid" id="kpiGrid">
     <div class="kpi"><div class="kpi-label">Total Score</div><div class="kpi-value" id="kpiScore">—</div><div class="kpi-detail" id="kpiScoreDetail">&nbsp;</div><div class="kpi-spark"></div></div>
     <div class="kpi"><div class="kpi-label">Active Employees</div><div class="kpi-value" id="kpiActive">—</div><div class="kpi-detail" id="kpiActiveDetail">&nbsp;</div></div>
-    <div class="kpi"><div class="kpi-label">Top Performer</div><div class="kpi-value numeric" id="kpiTop">—</div><div class="kpi-detail" id="kpiTopDetail">&nbsp;</div></div>
+    <div class="kpi" id="kpiTopCard"><div class="kpi-label" id="kpiTopLabel">Top Performer</div><div class="kpi-value numeric" id="kpiTop">—</div><div class="kpi-detail" id="kpiTopDetail">&nbsp;</div></div>
     <div class="kpi"><div class="kpi-label">External Reach</div><div class="kpi-value" id="kpiExt">—</div><div class="kpi-detail" id="kpiExtDetail">&nbsp;</div></div>
     <div class="kpi"><div class="kpi-label">Posts Tracked</div><div class="kpi-value" id="kpiPosts">—</div><div class="kpi-detail" id="kpiPostsDetail">&nbsp;</div></div>
   </div>
@@ -663,7 +721,7 @@
 
   <div class="section">
     <div class="section-head">
-      <div class="section-title">Leaderboard<span class="num" id="lbCountMeta">—</span></div>
+      <div class="section-title">Leaderboard<span class="num" id="lbCountMeta">—</span><span class="period-badge" id="lbPeriodBadge">Last 7 Days</span></div>
     </div>
     <div class="table-card">
       <div class="table-toolbar">
@@ -721,6 +779,10 @@ const CONFIG = {
   REFRESH_MINUTES: 30
 };
 
+// Earliest month shown in the Period dropdown (YYYY-MM). Anything before this
+// — e.g. stray rows from a wider one-time backfill — is hidden from the picker.
+const MIN_MONTH = '2026-04';
+
 const SHEET = id => `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(id)}`;
 
 const ENTITY_COLORS = {
@@ -730,6 +792,7 @@ const ENTITY_COLORS = {
   'SimplifyX™': '#C285BF',
   'Simplify Alpha': '#42CCA1',
   'Simplify Ventures': '#D6B73E',
+  'Simplify Connect': '#8C7BE6',
   'Simplify Group': '#5BB574',
   'Simplify Recruiting': '#F58532',
   'Simplify Docs': '#C968A7',
@@ -767,8 +830,104 @@ let STATE = {
   view: 'employees', search: '', entityFilter: '',
   sortKey: 'total_points', sortDir: 'desc',
   postsView: 'top10',
+  period: 'last7',
   charts: { mix: null, entity: null }
 };
+
+// ── Period (month dropdown) support ───────────────────────────────────────
+function monthKeyOf(r) {
+  const d = (r.post_date || '').toString().trim();
+  return /^\d{4}-\d{2}/.test(d) ? d.slice(0, 7) : '';
+}
+function monthLabel(mk) {
+  const names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [y, m] = mk.split('-').map(Number);
+  return (names[m - 1] || mk) + ' ' + y;
+}
+function periodNoun() {
+  return STATE.period === 'last7' ? 'the last 7 days' : monthLabel(STATE.period);
+}
+function availableMonths() {
+  const set = new Set();
+  STATE.raw.forEach(r => { const mk = monthKeyOf(r); if (mk && mk >= MIN_MONTH) set.add(mk); });
+  return Array.from(set).sort().reverse(); // newest month first
+}
+// collapse duplicate engagements (overlapping scans, repost rows) — same key as n8n
+function dedupeRaw(rows) {
+  const seen = new Set(), out = [];
+  for (const r of rows) {
+    if (!r.person_name) continue;
+    const key = (r.person_name || '').toString().trim().toLowerCase() + '||'
+      + (r.post_url || '').toString().split('?')[0].trim().toLowerCase() + '||'
+      + (r.engagement_type || '').toString().trim().toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key); out.push(r);
+  }
+  return out;
+}
+// raw rows for the selected period, de-duplicated
+function getActiveRaw() {
+  let rows;
+  if (STATE.period === 'last7') {
+    const pdates = STATE.raw.map(r => (r.post_date || '').toString().trim())
+      .filter(d => /^\d{4}-\d{2}-\d{2}/.test(d)).sort();
+    const maxD = pdates[pdates.length - 1];
+    if (maxD) {
+      const c = new Date(maxD + 'T00:00:00Z');
+      c.setUTCDate(c.getUTCDate() - 6); // 7-day inclusive window ending at most-recent post
+      const cutoff = c.toISOString().slice(0, 10);
+      rows = STATE.raw.filter(r => { const d = (r.post_date || '').toString().trim(); return d && d >= cutoff; });
+    } else {
+      rows = STATE.raw;
+    }
+  } else {
+    rows = STATE.raw.filter(r => monthKeyOf(r) === STATE.period);
+  }
+  return dedupeRaw(rows);
+}
+// build a leaderboard (same shape as the Leaderboard tab) from raw rows
+function computeLeaderboard(rows) {
+  const map = new Map();
+  rows.forEach(r => {
+    if (String(r.is_company_page).toLowerCase().includes('true')) return;
+    if (String(r.is_employee).toLowerCase() !== 'true') return;
+    const key = (r.person_name || '').toString().trim();
+    if (!key) return;
+    if (!map.has(key)) {
+      map.set(key, {
+        employee_name: key,
+        headline: r.person_headline || '',
+        employee_entity: r.employee_entity || 'Unknown',
+        likes: 0, comments: 0, shares: 0,
+        linkedin_url: r.person_linkedin_url || ''
+      });
+    }
+    const e = map.get(key);
+    if (r.person_linkedin_url && !e.linkedin_url) e.linkedin_url = r.person_linkedin_url;
+    if (r.person_headline && !e.headline) e.headline = r.person_headline;
+    const t = (r.engagement_type || 'LIKE').toString().toUpperCase();
+    if (t === 'COMMENT') e.comments++;
+    else if (t === 'SHARE') e.shares++;
+    else e.likes++;
+  });
+  return Array.from(map.values()).map(e => ({
+    ...e,
+    total_points: e.likes * 1 + e.comments * 3 + e.shares * 5,
+    total_engagements: e.likes + e.comments + e.shares
+  }));
+}
+// leaderboard for the active period: Leaderboard tab for "last 7 days", computed for months
+function getActiveLeaderboard() {
+  return STATE.period === 'last7' ? STATE.leaderboard : computeLeaderboard(getActiveRaw());
+}
+function populatePeriodSelect() {
+  const sel = document.getElementById('periodSelect');
+  const opts = ['<option value="last7">Last 7 Days</option>']
+    .concat(availableMonths().map(mk => `<option value="${mk}">${monthLabel(mk)}</option>`));
+  sel.innerHTML = opts.join('');
+  if (![...sel.options].some(o => o.value === STATE.period)) STATE.period = 'last7';
+  sel.value = STATE.period;
+}
 
 async function fetchCsv(tab) {
   const url = SHEET(tab);
@@ -800,6 +959,7 @@ async function loadAndRender() {
     loadingEl.style.display = 'none';
     document.getElementById('app').style.display = 'block';
     populateEntityFilter();
+    populatePeriodSelect();
     renderAll();
     document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   } catch (e) {
@@ -819,8 +979,10 @@ function renderTopbar() {
 }
 
 function renderKpis() {
-  const lb = STATE.leaderboard;
-  const raw = STATE.raw;
+  const lb = getActiveLeaderboard();
+  const raw = getActiveRaw();
+  const isMonth = STATE.period !== 'last7';
+  const noun = periodNoun();
   const totalScore = lb.reduce((s, r) => s + (Number(r.total_points) || 0), 0);
   const totalLikes = lb.reduce((s, r) => s + (Number(r.likes) || 0), 0);
   const totalComments = lb.reduce((s, r) => s + (Number(r.comments) || 0), 0);
@@ -837,17 +999,26 @@ function renderKpis() {
   document.getElementById('kpiScore').textContent = totalScore.toLocaleString();
   document.getElementById('kpiScoreDetail').innerHTML = `<span class="num">${totalLikes}</span> likes · <span class="num">${totalComments}</span> comments · <span class="num">${totalShares}</span> shares`;
   document.getElementById('kpiActive').textContent = activeEmployees;
-  document.getElementById('kpiActiveDetail').textContent = `with ≥1 engagement this scan`;
+  document.getElementById('kpiActiveDetail').textContent = `with ≥1 engagement in ${noun}`;
+
+  // Top Performer card — becomes "Employee of [Month]" when a month is selected
+  document.getElementById('kpiTopLabel').textContent = isMonth ? `Employee of ${monthLabel(STATE.period)}` : 'Top Performer';
   document.getElementById('kpiTop').textContent = top ? top.employee_name : '—';
   document.getElementById('kpiTopDetail').innerHTML = top ? `<span class="num">${top.total_points}</span> pts · ${top.employee_entity || 'Unknown'}` : '';
+  document.getElementById('kpiTopCard').classList.toggle('winner', isMonth && !!top);
+
   document.getElementById('kpiExt').textContent = externalNames.size;
-  document.getElementById('kpiExtDetail').textContent = `unique externals reposted/reacted`;
+  document.getElementById('kpiExtDetail').textContent = `unique externals engaged`;
   document.getElementById('kpiPosts').textContent = uniquePosts;
   document.getElementById('kpiPostsDetail').innerHTML = `across <span class="num">${uniquePages}</span> company pages`;
+
+  // section badge reflecting current period
+  const badge = document.getElementById('lbPeriodBadge');
+  if (badge) badge.textContent = isMonth ? monthLabel(STATE.period) : 'Last 7 Days';
 }
 
 function renderCharts() {
-  const lb = STATE.leaderboard;
+  const lb = getActiveLeaderboard();
   const totalLikes = lb.reduce((s, r) => s + (Number(r.likes) || 0), 0);
   const totalComments = lb.reduce((s, r) => s + (Number(r.comments) || 0), 0);
   const totalShares = lb.reduce((s, r) => s + (Number(r.shares) || 0), 0);
@@ -888,7 +1059,7 @@ function renderCharts() {
   ).join('');
 
   const byEntity = {};
-  STATE.leaderboard.forEach(r => {
+  lb.forEach(r => {
     const e = r.employee_entity || 'Unknown';
     if (!byEntity[e]) byEntity[e] = { score: 0, count: 0 };
     byEntity[e].score += Number(r.total_points) || 0;
@@ -943,6 +1114,7 @@ function entityClass(e) {
   if (k.includes('simplifyx') || k.includes('simplify x')) return 'simplifyx';
   if (k.includes('alpha')) return 'alpha';
   if (k.includes('ventures')) return 'ventures';
+  if (k.includes('connect')) return 'connect';
   if (k.includes('group')) return 'group';
   if (k.includes('recruiting')) return 'recruiting';
   if (k.includes('docs')) return 'docs';
@@ -957,18 +1129,24 @@ function entityShort(e) {
     .replace('Simplify Group', 'Group')
     .replace('Simplify Alpha', 'Alpha')
     .replace('Simplify Ventures', 'Ventures')
+    .replace('Simplify Connect', 'Connect')
     .replace('Simplify Docs', 'Docs');
 }
 
 function populateEntityFilter() {
   const sel = document.getElementById('lbEntity');
-  const entities = [...new Set(STATE.leaderboard.map(r => r.employee_entity).filter(Boolean))].sort();
+  // derive from all employees in Raw Engagements so it covers every period
+  const entities = [...new Set(
+    STATE.raw
+      .filter(r => String(r.is_employee).toLowerCase() === 'true')
+      .map(r => r.employee_entity).filter(Boolean)
+  )].sort();
   sel.innerHTML = '<option value="">All entities</option>' + entities.map(e => `<option value="${e}">${entityShort(e)}</option>`).join('');
 }
 
 function getViewRows() {
   if (STATE.view === 'employees') {
-    return STATE.leaderboard.map(r => ({
+    return getActiveLeaderboard().map(r => ({
       employee_name: r.employee_name,
       headline: r.headline,
       employee_entity: r.employee_entity,
@@ -982,7 +1160,7 @@ function getViewRows() {
     }));
   }
   const map = new Map();
-  STATE.raw.forEach(r => {
+  getActiveRaw().forEach(r => {
     if (!r.person_name) return;
     if (String(r.is_company_page).toLowerCase().includes('true')) return;
     const key = r.person_name.trim();
@@ -1074,7 +1252,7 @@ function escapeHtml(s) {
 
 function renderTopPosts() {
   const map = new Map();
-  STATE.raw.forEach(r => {
+  getActiveRaw().forEach(r => {
     const url = r.post_url;
     if (!url) return;
     if (!map.has(url)) {
@@ -1235,6 +1413,7 @@ document.querySelectorAll('.toggle button').forEach(btn => {
 });
 document.getElementById('lbSearch').addEventListener('input', e => { STATE.search = e.target.value; renderLeaderboard(); });
 document.getElementById('lbEntity').addEventListener('change', e => { STATE.entityFilter = e.target.value; renderLeaderboard(); });
+document.getElementById('periodSelect').addEventListener('change', e => { STATE.period = e.target.value; renderAll(); });
 document.querySelectorAll('th.sortable').forEach(th => {
   th.addEventListener('click', () => {
     const k = th.dataset.key;
