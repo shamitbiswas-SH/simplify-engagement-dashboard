@@ -977,8 +977,8 @@ async function loadAndRender() {
       fetchCsv(CONFIG.LEADERBOARD_TAB),
       fetchCsv(CONFIG.RAW_ENGAGEMENTS_TAB)
     ]);
-    STATE.leaderboard = lb.filter(r => r.employee_name);
-    STATE.raw = raw.filter(r => r.person_name);
+    STATE.leaderboard = lb.filter(r => r.employee_name).map(canonicalizeRow);
+    STATE.raw = raw.filter(r => r.person_name).map(canonicalizeRow);
     loadingEl.style.display = 'none';
     document.getElementById('app').style.display = 'block';
     populateEntityFilter();
@@ -1145,10 +1145,27 @@ function entityClass(e) {
   return 'unknown';
 }
 
+// Normalize stored values so the healthcare short code always reads as the full brand name,
+// across every view (leaderboard tags, By-Entity chart, filters, KPIs).
+function canonicalEntity(e) {
+  if (e === null || e === undefined || e === '') return e;
+  let s = String(e).replace('™', '').trim();
+  if (/^shc$/i.test(s)) return 'Simplify Healthcare';
+  return s;
+}
+function canonicalizeRow(r) {
+  const row = { ...r };
+  if ('employee_entity' in row) row.employee_entity = canonicalEntity(row.employee_entity);
+  if ('company_page' in row) row.company_page = canonicalEntity(row.company_page);
+  return row;
+}
+
 function entityShort(e) {
-  // Full brand names — no abbreviations; entity names are shown exactly as stored
+  // Full brand names — no abbreviations; the healthcare short code expands to the full name
   if (!e) return '—';
-  return String(e).replace('™', '').trim();
+  let s = String(e).replace('™', '').trim();
+  if (/^shc$/i.test(s)) s = 'Simplify Healthcare';
+  return s;
 }
 
 function populateEntityFilter() {
